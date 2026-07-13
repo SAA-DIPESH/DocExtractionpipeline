@@ -1,0 +1,15 @@
+docling
+fastapi
+numpy<2
+opencv-python==4.8.1.78
+pypdfium2==4.30.0
+python-multipart
+transformers<5
+uvicorn
+langchain-text-splitters
+langchain-openai
+langchain-ollama
+dotenv
+qdrant-client
+langchain-mistralai
+fastembed
