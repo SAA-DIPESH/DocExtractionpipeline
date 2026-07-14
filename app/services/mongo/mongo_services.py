@@ -1,5 +1,6 @@
 import os
 import re
+import ntpath
 from typing import Optional
 from datetime import datetime
 from bson import ObjectId
@@ -136,11 +137,44 @@ def _find_matching_local_file(directory: str, document_name: str | None) -> str 
     return matches[0] if len(matches) == 1 else None
 
 
+def _has_drive_or_unc_root(file_path: str) -> bool:
+    windows_drive, _ = ntpath.splitdrive(file_path)
+    return bool(windows_drive) or file_path.startswith("\\\\")
+
+
+def _apply_document_base_path(file_path: str) -> str:
+    document_base_path = os.getenv("DOCUMENT_BASE_PATH", "").strip()
+    if _has_drive_or_unc_root(file_path):
+        return file_path
+
+    if not document_base_path:
+        return file_path
+
+    relative_file_path = file_path.lstrip("/\\")
+    return os.path.join(document_base_path, relative_file_path)
+
+
+def _looks_like_file_path(file_path: str, document_name: str | None, blob_id: str | None) -> bool:
+    file_name = os.path.basename(file_path.rstrip("/\\"))
+    if document_name and file_name.lower() == document_name.lower():
+        return True
+
+    if blob_id and file_name.lower() == os.path.basename(blob_id).lower():
+        return True
+
+    return bool(os.path.splitext(file_name)[1])
+
+
 def _resolve_local_file_path(file_path: str, document_name: str | None, blob_id: str | None) -> str:
     if not file_path:
         return file_path
 
+    file_path = _apply_document_base_path(file_path)
+
     if os.path.isfile(file_path):
+        return file_path
+
+    if _looks_like_file_path(file_path, document_name, blob_id):
         return file_path
 
     if document_name:

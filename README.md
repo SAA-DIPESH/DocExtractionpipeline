@@ -10,6 +10,12 @@ Token usage logs are sent only when this env variable is configured:
 AI_USAGE_LOG_API="https://vibeappop.saa.ai/DocAI/api/Contract/InsertAiUsageLog"
 ```
 
+If MongoDB stores only a relative document path, configure the local/server root folder:
+
+```env
+DOCUMENT_BASE_PATH="D:/Uploads/TenderDocuments"
+```
+
 The request body `bearer_token` is forwarded as:
 
 ```http
