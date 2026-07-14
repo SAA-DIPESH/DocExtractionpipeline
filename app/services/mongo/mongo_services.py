@@ -37,6 +37,13 @@ def _first_value(document: dict, *keys: str):
     return None
 
 
+def _first_present_key(document: dict, *keys: str) -> str | None:
+    for key in keys:
+        if key in document:
+            return key
+    return None
+
+
 def _company_id_conditions(company_profile_id: str | None) -> list[dict]:
     return [
         {"CompanyProfileId": company_profile_id},
@@ -47,6 +54,7 @@ def _company_id_conditions(company_profile_id: str | None) -> list[dict]:
         {"companyID": company_profile_id},
         {"CompanyId": company_profile_id},
         {"companyId": company_profile_id},
+        {"companyid": company_profile_id},
     ]
 
 
@@ -57,6 +65,23 @@ def _tender_id_conditions(tender_id: str | None) -> list[dict]:
         {"TenderID": tender_id},
         {"tenderID": tender_id},
     ]
+
+
+def _document_lookup_query(
+    tender_id: str | None,
+    company_profile_id: str | None,
+) -> tuple[str, dict]:
+    if not tender_id and not company_profile_id:
+        raise ValueError("Pass tender_id, company_profile_id, or both")
+
+    if tender_id:
+        filters = [{"$or": _tender_id_conditions(tender_id)}]
+        if company_profile_id:
+            filters.append({"$or": _company_id_conditions(company_profile_id)})
+
+        return "CPTenderDocuments", filters[0] if len(filters) == 1 else {"$and": filters}
+
+    return "CPDocuments", {"$or": _company_id_conditions(company_profile_id)}
 
 
 def _eligible_document_conditions() -> list[dict]:
@@ -241,9 +266,7 @@ class MongoService:
         )
 
         if not document:
-            raise ValueError(
-                f"No taxonomy found for tender_id={tender_id}"
-            )
+            return []
 
         return document.get("classificationSet", [])
 
@@ -336,7 +359,19 @@ class MongoService:
             if tender_id:
                 update_document["TenderId"] = tender_id
             if company_id:
-                update_document["CompanyProfileId"] = company_id
+                company_id_field = _first_present_key(
+                    existing_document,
+                    "CompanyProfileId",
+                    "companyProfileId",
+                    "CompanyProfileID",
+                    "companyProfileID",
+                    "CompanyID",
+                    "companyID",
+                    "CompanyId",
+                    "companyId",
+                    "companyid",
+                ) or "CompanyId"
+                update_document[company_id_field] = company_id
             if resolved_blob_id:
                 update_document["BlobId"] = resolved_blob_id
             if document_name:
@@ -428,21 +463,16 @@ class MongoService:
         tender_id: str | None = None,
         company_profile_id: str | None = None,
     ) -> list[dict]:
-        if bool(tender_id) == bool(company_profile_id):
-            raise ValueError("Pass exactly one of tender_id or company_profile_id")
-
-        if tender_id:
-            collection_name = "CPTenderDocuments"
-            query = {
-                "$or": _tender_id_conditions(tender_id),
-            }
-        else:
-            collection_name = "CPDocuments"
-            query = {
-                "$or": _company_id_conditions(company_profile_id),
-            }
-
-        query["$and"] = _eligible_document_conditions()
+        collection_name, base_query = _document_lookup_query(
+            tender_id=tender_id,
+            company_profile_id=company_profile_id,
+        )
+        query = {
+            "$and": [
+                base_query,
+                *_eligible_document_conditions(),
+            ],
+        }
 
         documents = self.db[collection_name].find(query)
         processed_documents = []
@@ -460,6 +490,7 @@ class MongoService:
                 "companyID",
                 "CompanyId",
                 "companyId",
+                "companyid",
             )
             resolved_tender_id = _first_value(
                 document,
@@ -513,19 +544,16 @@ class MongoService:
         tender_id: str | None = None,
         company_profile_id: str | None = None,
     ) -> dict:
-        if bool(tender_id) == bool(company_profile_id):
-            raise ValueError("Pass exactly one of tender_id or company_profile_id")
-
-        if tender_id:
-            collection_name = "CPTenderDocuments"
-            base_query = {"$or": _tender_id_conditions(tender_id)}
-        else:
-            collection_name = "CPDocuments"
-            base_query = {"$or": _company_id_conditions(company_profile_id)}
+        collection_name, base_query = _document_lookup_query(
+            tender_id=tender_id,
+            company_profile_id=company_profile_id,
+        )
 
         eligible_query = {
-            **base_query,
-            "$and": _eligible_document_conditions(),
+            "$and": [
+                base_query,
+                *_eligible_document_conditions(),
+            ],
         }
 
         return {
@@ -546,7 +574,7 @@ class MongoService:
             documents.extend(
                 self.db["CPDocuments"].find(
                     {
-                        "CompanyProfileId": company_profile_id,
+                        "$or": _company_id_conditions(company_profile_id),
                         "IsActive": False,
                         "IsLoadByAI": False
                         

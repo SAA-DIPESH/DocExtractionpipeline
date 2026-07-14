@@ -7,7 +7,6 @@ from docling.datamodel.base_models import InputFormat
 from docling.datamodel.pipeline_options import PdfPipelineOptions
 from docling.document_converter import DocumentConverter, PdfFormatOption  # type: ignore
 from docling_core.types.doc import (
-    PictureItem,
     SectionHeaderItem,
     TableItem,
     TextItem,
@@ -15,8 +14,6 @@ from docling_core.types.doc import (
 
 input_file = ""
 output_md = "app/infrastrature/documents/out_doc/"
-image_dir = Path("images")
-image_dir.mkdir(exist_ok=True)
 
 
 def _clean_text(text: str) -> str:
@@ -41,9 +38,8 @@ def _get_page_number(element) -> int | None:
 
 class DoclingService:
 
-    def __init__(self, image_dir: Union[str, Path] = "images"):
+    def __init__(self):
         """Initializes the DoclingService and sets up the document converter pipeline."""
-        self.image_dir = Path(image_dir)
         self.last_page_count = 0
         self._init_converter()
 
@@ -51,9 +47,9 @@ class DoclingService:
         """Configures the pipeline options and instantiates the DocumentConverter."""
         pipeline_options = PdfPipelineOptions()
 
-        # Required for extracting images via get_image()
-        pipeline_options.generate_page_images = True
-        pipeline_options.generate_picture_images = True
+        # Image generation is disabled during document processing.
+        # pipeline_options.generate_page_images = True
+        # pipeline_options.generate_picture_images = True
 
         self.converter = DocumentConverter(
             format_options={
@@ -66,12 +62,11 @@ class DoclingService:
     def convert_pdf_to_markdown(
         self, input_file: Union[str, Path], output_md_path: Union[str, Path]
     ) -> Path:
-        """Converts an input PDF into Markdown format, extracts images, and saves both to disk."""
+        """Converts an input PDF into Markdown format."""
         input_path = Path(input_file)
         output_path = Path(output_md_path)
 
-        # Ensure directories exist
-        self.image_dir.mkdir(parents=True, exist_ok=True)
+        # Ensure output directory exists
         if output_path.suffix:
             output_path.parent.mkdir(parents=True, exist_ok=True)
         else:
@@ -85,7 +80,7 @@ class DoclingService:
         self.last_page_count = len(getattr(doc, "pages", {}) or {})
 
         markdown_segments = []
-        image_count = 1
+        # image_count = 1
         current_page_number = None
 
         # Iterate document elements
@@ -109,18 +104,7 @@ class DoclingService:
                 markdown_segments.append(element.export_to_markdown(doc=doc))
                 markdown_segments.append("\n")
 
-            # --- Image / Figure / Flowchart ---
-            elif isinstance(element, PictureItem):
-                image = element.get_image(doc)
-                if image is not None:
-                    image_path = self.image_dir / f"image_{image_count}.png"
-                    image.save(image_path)
-
-                    markdown_segments.append(
-                        f"\n![Image {image_count}]({image_path.as_posix()})\n"
-                    )
-                    print(f"Saved image: {image_path}")
-                    image_count += 1
+            # Image extraction is disabled during document processing.
 
         # Save markdown output
         output_path.write_text("\n".join(markdown_segments), encoding="utf-8")

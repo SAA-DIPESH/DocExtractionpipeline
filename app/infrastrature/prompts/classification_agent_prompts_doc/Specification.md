@@ -83,6 +83,12 @@ Its only responsibility is to identify the most appropriate document type.
 
 - If multiple document types are similar, choose the one with the highest evidence overlap.
 
+- If classification_set is empty or unavailable, return:
+
+```
+UNKNOWN_OR_UNCLEAR
+```
+
 - If there is insufficient evidence to classify the document, return:
 
 ```
@@ -126,7 +132,7 @@ UNKNOWN_OR_UNCLEAR
 
 ## Validation Rules
 
-- document_type must come only from the supplied classification_set.
+- document_type must come only from the supplied classification_set, except UNKNOWN_OR_UNCLEAR when taxonomy is empty or evidence is insufficient.
 
 - classification_confidence must be a number from 0 to 100.
 

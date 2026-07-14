@@ -232,10 +232,10 @@ async def process_documents_from_mongo(request: MongoDocumentProcessRequest):
     )
     bearer_token = clean_optional_string(request.bearer_token)
 
-    if bool(tender_id) == bool(company_id):
+    if not tender_id and not company_id:
         raise HTTPException(
             status_code=400,
-            detail="Pass exactly one of tender_id or company_id.",
+            detail="Pass tender_id, company_id, or both.",
         )
 
     run_id = str(uuid4())
@@ -289,6 +289,22 @@ async def process_documents_from_mongo(request: MongoDocumentProcessRequest):
             )
             continue
 
+        source_ids = []
+        if tender_id:
+            source_ids.append(
+                {
+                    "sourceIdType": "tender",
+                    "id": tender_id,
+                }
+            )
+        if resolved_company_id:
+            source_ids.append(
+                {
+                    "sourceIdType": "company",
+                    "id": resolved_company_id,
+                }
+            )
+
         usage_context = {
             "applicationName": "Tender",
             "runId": run_id,
@@ -299,7 +315,7 @@ async def process_documents_from_mongo(request: MongoDocumentProcessRequest):
             "userName": clean_optional_string(request.user_name),
             "purpose": "document_mongo_processing",
             "bearerToken": bearer_token,
-            "sourceIds": [
+            "sourceIds": source_ids or [
                 {
                     "sourceIdType": document_scope,
                     "id": source_id,

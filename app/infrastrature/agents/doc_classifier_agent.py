@@ -32,6 +32,18 @@ async def document_classifier_agent(
     classification_set: list[dict],
     usage_context: dict | None = None,
 ):
+    if not classification_set:
+        return {
+            "data": _normalize_classification_data(
+                {
+                    "document_type": "UNKNOWN_OR_UNCLEAR",
+                    "classification_confidence": 0,
+                    "relevance_score": 0,
+                    "reason": "No classification taxonomy was available.",
+                }
+            )
+        }
+
     document_text = document_metadata.get("summary", "")
     formatted_messages = DOCUMENT_INTELLIGENCE_PROMPT.invoke(
         {
