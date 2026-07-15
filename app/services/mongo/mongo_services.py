@@ -245,25 +245,27 @@ class MongoService:
 
     def get_classification_set(
         self,
-        tender_id: str,
+        tender_id: Optional[str] = None,
+        company_profile_id: Optional[str] = None,
     ) -> list[dict]:
-       
-        document = self.collection.find_one(
-            {
-                "$or": [
-                    {"tenderId": tender_id},
-                    {"TenderId": tender_id},
-                    {"TenderID": tender_id},
-                    {"tenderID": tender_id},
-                ],
-            },
-            {
-                "_id": 0,
-                "classificationSet.code": 1,
-                "classificationSet.name": 1,
-                "classificationSet.expectedSignals": 1,
-            },
-        )
+        projection = {
+            "_id": 0,
+            "classificationSet.code": 1,
+            "classificationSet.name": 1,
+            "classificationSet.expectedSignals": 1,
+        }
+
+        queries = []
+        if tender_id:
+            queries.append({"$or": _tender_id_conditions(tender_id)})
+        if company_profile_id:
+            queries.append({"$or": _company_id_conditions(company_profile_id)})
+
+        document = None
+        for query in queries:
+            document = self.collection.find_one(query, projection)
+            if document:
+                break
 
         if not document:
             return []

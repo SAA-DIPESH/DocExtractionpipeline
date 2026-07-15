@@ -47,7 +47,10 @@ async def process_document(
         metadata = docling.extract_markdown_metadata(markdown_path)
         metadata["source_file_name"] = document_name
         metadata["source_file_extension"] = pdf_file_path.suffix.lstrip(".").lower()
-        classification_set = mongo.get_classification_set(tender_id=tender_id) if tender_id else []
+        classification_set = mongo.get_classification_set(
+            tender_id=tender_id,
+            company_profile_id=company_id,
+        )
         classification_response = await document_classifier_agent(
             document_metadata=metadata,
             classification_set=classification_set,
