@@ -67,6 +67,16 @@ def _tender_id_conditions(tender_id: str | None) -> list[dict]:
     ]
 
 
+def _cpv_set_for_conditions(*values: str) -> list[dict]:
+    fields = (
+        "CPVsetfor",
+        "CPVSetFor",
+        "cpvSetFor",
+        "cpvsetfor",
+    )
+    return [{field: value} for field in fields for value in values]
+
+
 def _document_lookup_query(
     tender_id: str | None,
     company_profile_id: str | None,
@@ -248,6 +258,9 @@ class MongoService:
         tender_id: Optional[str] = None,
         company_profile_id: Optional[str] = None,
     ) -> list[dict]:
+        if not tender_id and not company_profile_id:
+            return []
+
         projection = {
             "_id": 0,
             "classificationSet.code": 1,
@@ -255,17 +268,18 @@ class MongoService:
             "classificationSet.expectedSignals": 1,
         }
 
-        queries = []
+        filters = []
         if tender_id:
-            queries.append({"$or": _tender_id_conditions(tender_id)})
-        if company_profile_id:
-            queries.append({"$or": _company_id_conditions(company_profile_id)})
+            filters.append({"$or": _tender_id_conditions(tender_id)})
+            filters.append({"$or": _cpv_set_for_conditions("Tender", "tender")})
+        else:
+            filters.append({"$or": _cpv_set_for_conditions("Company", "company", "Compay", "compay")})
 
-        document = None
-        for query in queries:
-            document = self.collection.find_one(query, projection)
-            if document:
-                break
+        if company_profile_id:
+            filters.append({"$or": _company_id_conditions(company_profile_id)})
+
+        query = filters[0] if len(filters) == 1 else {"$and": filters}
+        document = self.collection.find_one(query, projection)
 
         if not document:
             return []
